@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f7fb">
+    <title>Retail Sales Insights</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Analysis Insights home">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span>Retail<span class="brand-accent">Insights</span></span>
+        </a>
+        <span class="data-period">{{ dashboard.date_range[0] }} – {{ dashboard.date_range[1] }}</span>
+      </header>
+
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">SALES OVERVIEW</p>
+          <h1>Your retail performance, at a glance.</h1>
+          <p class="page-intro">Explore sales activity across {{ dashboard.date_range[0] }} to {{ dashboard.date_range[1] }}.</p>
+        </div>
+        <div class="data-badge"><span class="status-dot"></span> Analysis ready</div>
+      </section>
+
+      <section class="metric-grid" aria-label="Sales summary">
+        <article class="metric-card metric-primary">
+          <span class="metric-label">Total sales volume</span>
+          <strong class="metric-value">{{ "{:,.0f}".format(dashboard.total_sales) }}</strong>
+          <span class="metric-note">recorded units</span>
+          <span class="metric-icon" aria-hidden="true">↗</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Retail sales</span>
+          <strong class="metric-value">{{ "{:,.0f}".format(dashboard.retail_sales) }}</strong>
+          <span class="metric-note">recorded units</span>
+          <span class="metric-icon metric-icon-retail" aria-hidden="true">▤</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Warehouse sales</span>
+          <strong class="metric-value">{{ "{:,.0f}".format(dashboard.warehouse_sales) }}</strong>
+          <span class="metric-note">{{ dashboard.warehouse_share_pct }}% of total volume</span>
+          <span class="metric-icon metric-icon-warehouse" aria-hidden="true">▥</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Products analysed</span>
+          <strong class="metric-value">{{ "{:,}".format(dashboard.product_count) }}</strong>
+          <span class="metric-note">from {{ "{:,}".format(dashboard.supplier_count) }} suppliers</span>
+          <span class="metric-icon metric-icon-products" aria-hidden="true">◇</span>
+        </article>
+      </section>
+
+      <section class="chart-grid" aria-label="Sales charts">
+        <article class="panel trend-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Sales by month</h2>
+              <p>Monthly recorded sales volume across the available date range</p>
+            </div>
+            <span class="panel-tag">MONTHLY</span>
+          </div>
+          <div class="trend-chart" role="img" aria-label="Monthly sales volume bar chart">
+            {% set max_month = dashboard.monthly_sales|map(attribute='sales')|max or 1 %}
+            {% for month in dashboard.monthly_sales %}
+              <div class="trend-column{% if not month.has_data %} trend-column-missing{% endif %}"
+                title="{% if month.has_data %}{{ month.label }}: {{ '{:,.0f}'.format(month.sales) }} units{% else %}{{ month.label }}: no records in this dataset{% endif %}">
+                <div class="trend-bar-wrap">
+                  {% if month.has_data %}
+                    <span class="trend-bar" data-height="{{ ((month.sales / max_month * 100)|round|int) }}"></span>
+                  {% else %}
+                    <span class="month-no-data" aria-hidden="true">—</span>
+                  {% endif %}
+                </div>
+                <span class="trend-label">{{ month.label }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="monthly-high-low">
+            <div>
+              <span>Best observed month</span>
+              <strong>{{ dashboard.best_month.label }} · {{ "{:,.0f}".format(dashboard.best_month.sales) }}</strong>
+            </div>
+            <div>
+              <span>Lowest observed month</span>
+              <strong>{{ dashboard.lowest_month.label }} · {{ "{:,.0f}".format(dashboard.lowest_month.sales) }}</strong>
+            </div>
+          </div>
+          <div class="chart-footnote">
+            {{ dashboard.observed_month_count }} of {{ dashboard.monthly_sales|length }} months have records.
+            Gaps indicate missing data, not zero sales.
+          </div>
+        </article>
+
+        <article class="panel type-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Sales by category</h2>
+              <p>Volume by item type</p>
+            </div>
+            <span class="panel-tag">CATEGORY</span>
+          </div>
+          {% set max_type = dashboard.item_types[0].sales or 1 %}
+          <div class="ranked-list">
+            {% for item in dashboard.item_types %}
+              <div class="ranked-row">
+                <div class="ranked-caption">
+                  <span class="ranked-name">{{ item.name }}</span>
+                  <span class="ranked-value">{{ "{:,.0f}".format(item.sales) }}</span>
+                </div>
+                <div class="rank-track"><span class="rank-fill" data-width="{{ ((item.sales / max_type * 100)|round|int) }}"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="chart-footnote">Recorded sales units</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Top products</h2>
+              <p>Products with the highest sales volume</p>
+            </div>
+            <span class="panel-tag">PRODUCTS</span>
+          </div>
+          {% set max_product = dashboard.top_products[0].sales or 1 %}
+          <div class="ranked-list">
+            {% for item in dashboard.top_products %}
+              <div class="ranked-row">
+                <div class="ranked-caption">
+                  <span class="ranked-name">{{ item.name }}</span>
+                  <span class="ranked-value">{{ "{:,.0f}".format(item.sales) }}</span>
+                </div>
+                <div class="rank-track"><span class="rank-fill rank-fill-teal" data-width="{{ ((item.sales / max_product * 100)|round|int) }}"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="chart-footnote">Top {{ dashboard.top_products|length }} products by recorded sales units</div>
+        </article>
+
+        <article class="panel supplier-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Supplier concentration</h2>
+              <p>Pareto view: ranked sales bars and cumulative share</p>
+            </div>
+            <span class="panel-tag">PARETO</span>
+          </div>
+          {% set plot_left = 48 %}
+          {% set plot_top = 18 %}
+          {% set plot_width = 620 %}
+          {% set plot_height = 166 %}
+          {% set plot_bottom = plot_top + plot_height %}
+          {% set supplier_step = plot_width / (dashboard.supplier_pareto|length or 1) %}
+          {% set max_supplier_sales = dashboard.supplier_pareto[0].sales or 1 %}
+          {% set target_y = plot_bottom - (dashboard.supplier_pareto_target_pct / 100 * plot_height) %}
+          <svg class="pareto-chart" viewBox="0 0 720 232" role="img"
+            aria-labelledby="pareto-title pareto-description">
+            <title id="pareto-title">Supplier sales and cumulative share</title>
+            <desc id="pareto-description">
+              The top {{ dashboard.supplier_pareto|length }} suppliers account for
+              {{ dashboard.supplier_pareto[-1].cumulative_share_pct }}% of sales.
+              Bars show units and the line shows cumulative share.
+            </desc>
+            <line class="pareto-gridline" x1="{{ plot_left }}" y1="{{ plot_top }}" x2="{{ plot_left + plot_width }}" y2="{{ plot_top }}" />
+            <line class="pareto-gridline" x1="{{ plot_left }}" y1="{{ plot_top + plot_height / 2 }}" x2="{{ plot_left + plot_width }}" y2="{{ plot_top + plot_height / 2 }}" />
+            <line class="pareto-gridline" x1="{{ plot_left }}" y1="{{ plot_bottom }}" x2="{{ plot_left + plot_width }}" y2="{{ plot_bottom }}" />
+            <line class="pareto-target" x1="{{ plot_left }}" y1="{{ target_y }}" x2="{{ plot_left + plot_width }}" y2="{{ target_y }}" />
+            <text class="pareto-axis-label" x="{{ plot_left + plot_width + 7 }}" y="{{ plot_top + 4 }}">100%</text>
+            <text class="pareto-target-label" x="{{ plot_left + plot_width + 7 }}" y="{{ target_y + 4 }}">{{ dashboard.supplier_pareto_target_pct }}%</text>
+            <text class="pareto-axis-label" x="{{ plot_left + plot_width + 7 }}" y="{{ plot_bottom + 4 }}">0%</text>
+            {% for item in dashboard.supplier_pareto %}
+              {% set center_x = plot_left + (loop.index0 + 0.5) * supplier_step %}
+              {% set bar_height = item.sales / max_supplier_sales * plot_height %}
+              {% set line_y = plot_bottom - (item.cumulative_share_pct / 100 * plot_height) %}
+              <rect class="pareto-bar" x="{{ center_x - supplier_step * 0.3 }}"
+                y="{{ plot_bottom - bar_height }}" width="{{ supplier_step * 0.6 }}" height="{{ bar_height }}">
+                <title>{{ item.name }}: {{ "{:,.0f}".format(item.sales) }} units</title>
+              </rect>
+              {% if not loop.first %}
+                {% set previous = dashboard.supplier_pareto[loop.index0 - 1] %}
+                {% set previous_x = plot_left + (loop.index0 - 0.5) * supplier_step %}
+                {% set previous_y = plot_bottom - (previous.cumulative_share_pct / 100 * plot_height) %}
+                <line class="pareto-line" x1="{{ previous_x }}" y1="{{ previous_y }}" x2="{{ center_x }}" y2="{{ line_y }}" />
+              {% endif %}
+              <circle class="pareto-point" cx="{{ center_x }}" cy="{{ line_y }}" r="3.2" />
+              <text class="pareto-rank" x="{{ center_x }}" y="{{ plot_bottom + 16 }}">{{ loop.index }}</text>
+            {% endfor %}
+          </svg>
+          <div class="pareto-legend">
+            <span><i class="pareto-bar-key"></i>Sales units</span>
+            <span><i class="pareto-line-key"></i>Cumulative share</span>
+          </div>
+          <ol class="supplier-list">
+            {% for item in dashboard.supplier_pareto %}
+              <li>
+                <span class="supplier-rank">{{ "%02d"|format(loop.index) }}</span>
+                <span class="supplier-name" title="{{ item.name }}">{{ item.name }}</span>
+                <strong>{{ "{:,.0f}".format(item.sales) }}</strong>
+                <span class="supplier-cumulative">{{ item.cumulative_share_pct }}%</span>
+              </li>
+            {% endfor %}
+          </ol>
+          <div class="chart-footnote">
+            Top {{ dashboard.supplier_pareto|length }} suppliers reach
+            {{ dashboard.supplier_pareto[-1].cumulative_share_pct }}% of recorded sales.
+          </div>
+        </article>
+
+        <article class="panel scatter-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Retail vs. warehouse by product</h2>
+              <p>Each dot is one product; points above the diagonal lean toward warehouse sales</p>
+            </div>
+            <span class="panel-tag">LOG SCALE</span>
+          </div>
+          <div class="scatter-plot">
+            <canvas id="product-scatter" role="img" tabindex="0"
+              aria-label="Log-scale scatter plot comparing retail and warehouse sales for {{ dashboard.product_count }} products. Points above the equal-sales diagonal sell more through the warehouse.">
+              Product retail versus warehouse sales scatter plot.
+            </canvas>
+            <div id="scatter-tooltip" class="scatter-tooltip" role="tooltip" hidden></div>
+          </div>
+          <script id="product-scatter-data" type="application/json">{{ dashboard.product_scatter|tojson }}</script>
+          <div class="chart-footnote">
+            {{ "{:,}".format(dashboard.product_count) }} products. Log10 axes; zero sales are placed at the 1-unit floor.
+            Hover over a point to see its product and channel totals.
+          </div>
+        </article>
+      </section>
+
+      <footer class="page-footer">
+        <span>Based on {{ "{:,}".format(dashboard.row_count) }} cleaned sales records.</span>
+        <span>Sales figures represent recorded quantities, not currency.</span>
+      </footer>
+    </main>
+
+    <section id="chat-panel" class="chat-panel" aria-label="Sales and general assistant" hidden>
+      <header class="chat-header">
+        <div class="assistant-avatar" aria-hidden="true">✳</div>
+        <div class="chat-heading">
+          <strong>Sales assistant</strong>
+          <span><span class="status-dot"></span> Ask about this analysis</span>
+        </div>
+        <button id="close-chat" class="close-chat" type="button" aria-label="Close chat">×</button>
+      </header>
+
+      <div id="conversation" class="conversation" aria-live="polite" aria-label="Conversation">
+        <article class="message message-assistant">
+          <span class="message-label">Sales assistant</span>
+          <p class="message-text">Hi! Ask me about the sales analysis or any general question.</p>
+        </article>
+      </div>
+      <div id="error-message" class="error-message" role="alert" hidden></div>
+      <div class="suggestions" aria-label="Suggested questions">
+        <button class="suggestion" type="button">Which month had the most sales?</button>
+        <button class="suggestion" type="button">What was the top-selling product?</button>
+      </div>
+      <form id="chat-form" class="composer">
+        <label class="sr-only" for="message-input">Ask a question</label>
+        <textarea id="message-input" name="message" rows="1" maxlength="2000"
+          placeholder="Ask a question..." required></textarea>
+        <button id="send-button" class="send-button" type="submit" aria-label="Send question">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </button>
+      </form>
+      <p class="disclaimer">Sales answers use this dashboard's analysis; general answers use general knowledge.</p>
+    </section>
+
+    <button id="chat-toggle" class="chat-toggle" type="button" aria-label="Open sales assistant" aria-expanded="false" aria-controls="chat-panel">
+      <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5 7.8 7.8 0 0 1-3.4-.78L4 20l1.34-4.12A7.45 7.45 0 0 1 5 12a7.5 7.5 0 1 1 15-.5Z" />
+        <path d="M8.5 12h.01M12 12h.01M15.5 12h.01" />
+      </svg>
+      <svg class="close-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </svg>
+      <span class="sr-only">Toggle sales assistant</span>
+    </button>
+  </body>
+</html>
